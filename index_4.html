@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Arrange photos or scans into one print-ready PDF, entirely in your browser.">
+<title>Contact Sheet</title>
+<style>
+  :root{
+    --bg:#EDF0F5;
+    --surface:#FFFFFF;
+    --surface-2:#F4F6FA;
+    --ink:#14171F;
+    --ink-soft:#5B6072;
+    --ink-faint:#8A90A0;
+    --line:#DBDFE6;
+    --line-strong:#C4C9D3;
+    --accent:#FF6A3D;
+    --accent-ink:#FFFFFF;
+    --accent-soft:#FFE6DB;
+    --danger:#E5484D;
+    --shadow: 0 1px 2px rgba(20,23,31,.05), 0 6px 18px rgba(20,23,31,.07);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1015;
+      --surface:#171A21;
+      --surface-2:#1B1F29;
+      --ink:#EEF0F5;
+      --ink-soft:#9CA3B5;
+      --ink-faint:#6B7180;
+      --line:#2B2F3A;
+      --line-strong:#3A3F4C;
+      --accent:#FF7D52;
+      --accent-ink:#14171F;
+      --accent-soft:#3A2A22;
+      --danger:#FF7A7E;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 26px rgba(0,0,0,.4);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1015;
+    --surface:#171A21;
+    --surface-2:#1B1F29;
+    --ink:#EEF0F5;
+    --ink-soft:#9CA3B5;
+    --ink-faint:#6B7180;
+    --line:#2B2F3A;
+    --line-strong:#3A3F4C;
+    --accent:#FF7D52;
+    --accent-ink:#14171F;
+    --accent-soft:#3A2A22;
+    --danger:#FF7A7E;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 26px rgba(0,0,0,.4);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after{ box-sizing:border-box; }
+  [hidden]{ display:none !important; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"IBM Plex Sans", system-ui, sans-serif;
+    font-size:14.5px;
+    line-height:1.5;
+    min-height:100%;
+  }
+  img{ max-width:100%; }
+  button{ font-family:inherit; }
+  .mono{ font-family:"IBM Plex Mono", ui-monospace, monospace; }
+
+  .app{ display:flex; flex-direction:column; min-height:100vh; }
+
+  .topbar{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:5;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:14px 20px; padding-top:calc(14px + env(safe-area-inset-top,0px));
+    background:var(--surface); border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .brand{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .brand-mark{
+    font-family:"Fraunces", Georgia, serif; font-weight:600; font-size:22px;
+    letter-spacing:.2px;
+  }
+  .brand-tag{ font-size:12.5px; color:var(--ink-soft); }
+  .topbar-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:9px 14px; border-radius:6px; border:1px solid var(--line-strong);
+    background:var(--surface); color:var(--ink);
+    font-size:13.5px; font-weight:500; cursor:pointer;
+  }
+  .btn:hover{ border-color:var(--ink-faint); }
+  .btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .btn-primary:hover{ filter:brightness(1.04); }
+  .btn-primary.busy{ opacity:.75; cursor:progress; }
+  .btn svg{ display:block; }
+
+  .workspace{ flex:1; display:grid; grid-template-columns:264px 1fr; gap:0; align-items:start; }
+  @media (max-width:860px){
+    .workspace{ grid-template-columns:1fr; }
+  }
+
+  .rail{
+    position:sticky; top:calc(63px + env(safe-area-inset-top,0px));
+    padding:20px; border-right:1px solid var(--line);
+    display:flex; flex-direction:column; gap:18px;
+    background:var(--surface);
+    align-self:start;
+  }
+  @media (max-width:860px){
+    .rail{ position:static; border-right:none; border-bottom:1px solid var(--line); }
+  }
+  .rail-title{
+    margin:0; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-faint);
+  }
+  .field{ display:flex; flex-direction:column; gap:8px; }
+  .field label{ font-size:12.5px; font-weight:500; color:var(--ink-soft); }
+  .field select{
+    padding:8px 10px; border-radius:6px; border:1px solid var(--line-strong);
+    background:var(--surface-2); color:var(--ink); font-size:13.5px; font-family:inherit;
+  }
+  .field-hint{ margin:0; font-size:11.5px; color:var(--ink-faint); }
+
+  .segmented{ display:flex; border:1px solid var(--line-strong); border-radius:6px; overflow:hidden; }
+  .segmented button{
+    flex:1; padding:8px 6px; border:none; background:var(--surface-2); color:var(--ink-soft);
+    font-size:12.5px; cursor:pointer; border-right:1px solid var(--line-strong);
+  }
+  .segmented button:last-child{ border-right:none; }
+  .segmented button.active{ background:var(--accent); color:var(--accent-ink); font-weight:600; }
+  .segmented button:disabled{ opacity:.4; cursor:not-allowed; }
+  .segmented.disabled{ opacity:.6; }
+
+  .rail-note{
+    margin:4px 0 0; font-size:11.5px; color:var(--ink-faint); line-height:1.5;
+    padding-top:14px; border-top:1px solid var(--line);
+  }
+
+  .sheet{ padding:22px; min-height:420px; }
+  .sheet.drag-active .dropzone{ border-color:var(--accent); background:var(--accent-soft); }
+
+  .dropzone{
+    border:2px dashed var(--line-strong); border-radius:10px;
+    min-height:340px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; text-align:center; cursor:pointer; color:var(--ink-soft); padding:32px 20px;
+  }
+  .dropzone svg{ color:var(--ink-faint); }
+  .dropzone strong{ color:var(--ink); font-size:16px; font-weight:600; }
+  .dropzone span{ font-size:13px; max-width:34ch; }
+
+  .grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(158px,1fr)); gap:16px;
+  }
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:8px;
+    box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column;
+  }
+  .card.dragging{ opacity:.4; }
+  .card-head{
+    display:flex; align-items:center; justify-content:space-between; gap:6px;
+    padding:6px 8px; background:var(--surface-2); border-bottom:1px solid var(--line);
+  }
+  .card-head .order{
+    font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:12px; font-weight:500;
+    color:var(--ink-soft); min-width:18px;
+  }
+  .card-head .grip{ color:var(--ink-faint); cursor:grab; display:flex; }
+  .icon-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:5px; border:1px solid transparent;
+    background:transparent; color:var(--ink-soft); cursor:pointer;
+  }
+  .icon-btn:hover{ background:var(--surface); border-color:var(--line-strong); color:var(--ink); }
+  .icon-btn:disabled{ opacity:.3; cursor:not-allowed; }
+  .icon-btn.danger:hover{ color:var(--danger); border-color:var(--danger); }
+
+  .thumb-frame{
+    aspect-ratio:1/1; background:var(--surface-2); display:flex; align-items:center;
+    justify-content:center; overflow:hidden; padding:10px;
+  }
+  .thumb-frame img{ max-width:100%; max-height:100%; display:block; transition:transform .15s ease; }
+
+  .card-meta{ padding:8px 10px 2px; display:flex; flex-direction:column; gap:2px; }
+  .fname{ font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .fdim{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:10.5px; color:var(--ink-faint); }
+
+  .card-actions{ display:flex; gap:4px; padding:6px 8px 10px; }
+
+  .statusbar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    padding:10px 20px calc(10px + env(safe-area-inset-bottom,0px));
+    border-top:1px solid var(--line); background:var(--surface);
+    font-size:12px; color:var(--ink-soft);
+  }
+  .status-msg{ font-weight:500; }
+  .status-msg[data-tone="error"]{ color:var(--danger); }
+  .status-msg[data-tone="success"]{ color:var(--ink); }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Contact Sheet</span>
+      <span class="brand-tag">Photos in, one print-ready PDF out — arranged right in your browser.</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" id="addBtn" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add images
+      </button>
+      <button class="btn btn-primary" id="convertBtn" type="button" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        Download PDF
+      </button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="rail" id="rail">
+      <h2 class="rail-title">Sheet settings</h2>
+
+      <div class="field">
+        <label for="pageSize">Page size</label>
+        <select id="pageSize">
+          <option value="a4">A4</option>
+          <option value="letter">US Letter</option>
+          <option value="legal">US Legal</option>
+          <option value="fit">Fit to image</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Orientation</label>
+        <div class="segmented" id="orientationGroup">
+          <button data-value="auto" class="active" type="button" aria-pressed="true">Auto</button>
+          <button data-value="portrait" type="button" aria-pressed="false">Portrait</button>
+          <button data-value="landscape" type="button" aria-pressed="false">Landscape</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Margin</label>
+        <div class="segmented" id="marginGroup">
+          <button data-value="none" type="button" aria-pressed="false">None</button>
+          <button data-value="narrow" type="button" aria-pressed="false">Narrow</button>
+          <button data-value="normal" class="active" type="button" aria-pressed="true">Normal</button>
+          <button data-value="wide" type="button" aria-pressed="false">Wide</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Image fit</label>
+        <div class="segmented" id="fitGroup">
+          <button data-value="contain" class="active" type="button" aria-pressed="true">Contain</button>
+          <button data-value="cover" type="button" aria-pressed="false">Fill page</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Quality</label>
+        <div class="segmented" id="qualityGroup">
+          <button data-value="high" class="active" type="button" aria-pressed="true">High</button>
+          <button data-value="medium" type="button" aria-pressed="false">Medium</button>
+          <button data-value="low" type="button" aria-pressed="false">Low</button>
+        </div>
+        <p class="field-hint" id="qualityHint">Full resolution — largest file.</p>
+      </div>
+
+      <p class="rail-note">Processed entirely on this device. Nothing is uploaded anywhere.</p>
+    </aside>
+
+    <main class="sheet" id="sheet">
+      <div class="dropzone" id="dropzone">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5-9 9"/></svg>
+        <strong>Drop photos here</strong>
+        <span>or click to browse. JPG, PNG, WEBP, GIF and more — arrange them below, then download one PDF.</span>
+      </div>
+      <div class="grid" id="grid" hidden></div>
+    </main>
+  </div>
+
+  <footer class="statusbar">
+    <span id="statusCount">No images yet</span>
+    <span id="statusMsg" class="status-msg" role="status" aria-live="polite"></span>
+  </footer>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var state = {
+    images: [],
+    settings: { pageSize:"a4", orientation:"auto", margin:"normal", fit:"contain", quality:"high" },
+    busy:false
+  };
+
+  var PAGE_SIZES = { a4:[595.28,841.89], letter:[612,792], legal:[612,1008] };
+  var MARGINS = { none:0, narrow:18, normal:36, wide:54 };
+  var QUALITY = { high:{q:0.92, cap:0}, medium:{q:0.8, cap:2400}, low:{q:0.6, cap:1600} };
+  var QUALITY_HINT = {
+    high:"Full resolution — largest file.",
+    medium:"Resized for a balance of size and detail.",
+    low:"Smaller file, good for quick sharing."
+  };
+
+  function $(sel, el){ return (el||document).querySelector(sel); }
+  function $all(sel, el){ return Array.prototype.slice.call((el||document).querySelectorAll(sel)); }
+
+  var fileInput = $("#fileInput");
+  var addBtn = $("#addBtn");
+  var convertBtn = $("#convertBtn");
+  var dropzone = $("#dropzone");
+  var grid = $("#grid");
+  var statusCount = $("#statusCount");
+  var statusMsg = $("#statusMsg");
+  var qualityHint = $("#qualityHint");
+  var sheet = $("#sheet");
+  var pageSizeSel = $("#pageSize");
+
+  var uid = 0;
+  var statusTimer = null;
+
+  function fmtBytes(n){
+    if(n < 1024) return n + " B";
+    if(n < 1024*1024) return (n/1024).toFixed(1) + " KB";
+    return (n/(1024*1024)).toFixed(1) + " MB";
+  }
+
+  function setStatus(msg, tone){
+    statusMsg.textContent = msg || "";
+    if(tone) statusMsg.dataset.tone = tone; else delete statusMsg.dataset.tone;
+    clearTimeout(statusTimer);
+    if(msg) statusTimer = setTimeout(function(){ statusMsg.textContent = ""; }, 5000);
+  }
+
+  function updateCount(){
+    if(!state.images.length){ statusCount.textContent = "No images yet"; return; }
+    var bytes = 0;
+    for(var i=0;i<state.images.length;i++) bytes += state.images[i].bytes;
+    statusCount.textContent = state.images.length + (state.images.length===1 ? " image" : " images") + " • " + fmtBytes(bytes) + " selected";
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[c];
+    });
+  }
+
+  function addFiles(fileList){
+    var files = Array.prototype.filter.call(fileList, function(f){ return f.type.indexOf("image/") === 0; });
+    if(!files.length) return;
+    files.forEach(function(file){
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      var entry = { id:"img"+(uid++), file:file, url:url, img:img, w:0, h:0, rotation:0, bytes:file.size };
+      img.onload = function(){ entry.w = img.naturalWidth; entry.h = img.naturalHeight; render(); };
+      img.onerror = function(){
+        setStatus("Couldn't read \"" + file.name + "\" — skipped.", "error");
+        state.images = state.images.filter(function(e){ return e.id !== entry.id; });
+        render();
+      };
+      img.src = url;
+      state.images.push(entry);
+    });
+    render();
+  }
+
+  function removeImage(id){
+    var entry = state.images.filter(function(e){ return e.id===id; })[0];
+    if(entry) URL.revokeObjectURL(entry.url);
+    state.images = state.images.filter(function(e){ return e.id!==id; });
+    render();
+  }
+
+  function rotateImage(id){
+    var entry = state.images.filter(function(e){ return e.id===id; })[0];
+    if(entry){ entry.rotation = (entry.rotation + 90) % 360; render(); }
+  }
+
+  function moveImage(id, dir){
+    var i = -1;
+    for(var k=0;k<state.images.length;k++){ if(state.images[k].id===id){ i=k; break; } }
+    var j = i + dir;
+    if(i<0 || j<0 || j>=state.images.length) return;
+    var item = state.images.splice(i,1)[0];
+    state.images.splice(j,0,item);
+    render();
+  }
+
+  function reorderDrop(srcId, targetId){
+    if(srcId===targetId) return;
+    var from=-1, to=-1;
+    for(var k=0;k<state.images.length;k++){
+      if(state.images[k].id===srcId) from=k;
+      if(state.images[k].id===targetId) to=k;
+    }
+    if(from<0||to<0) return;
+    var item = state.images.splice(from,1)[0];
+    state.images.splice(to,0,item);
+    render();
+  }
+
+  var icons = {
+    rotate:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h5"/><path d="M4.6 13a8 8 0 1 0 1.9-8.4L4 9"/></svg>',
+    close:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>',
+    up:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+    down:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+    grip:'<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="8" cy="6" r="1.4"/><circle cx="8" cy="12" r="1.4"/><circle cx="8" cy="18" r="1.4"/><circle cx="16" cy="6" r="1.4"/><circle cx="16" cy="12" r="1.4"/><circle cx="16" cy="18" r="1.4"/></svg>'
+  };
+
+  function render(){
+    updateCount();
+    convertBtn.disabled = !state.images.length || state.busy;
+    if(!state.images.length){
+      dropzone.hidden = false;
+      grid.hidden = true;
+      grid.innerHTML = "";
+      return;
+    }
+    dropzone.hidden = true;
+    grid.hidden = false;
+    grid.innerHTML = state.images.map(function(e, i){
+      return (
+        '<div class="card" draggable="true" data-id="'+e.id+'">' +
+          '<div class="card-head">' +
+            '<span class="order mono">'+(i+1)+'</span>' +
+            '<span class="grip" title="Drag to reorder">'+icons.grip+'</span>' +
+            '<button class="icon-btn danger" type="button" data-action="remove" data-id="'+e.id+'" title="Remove" aria-label="Remove">'+icons.close+'</button>' +
+          '</div>' +
+          '<div class="thumb-frame">' +
+            '<img src="'+e.url+'" alt="'+escapeHtml(e.file.name)+'" style="transform:rotate('+e.rotation+'deg)">' +
+          '</div>' +
+          '<div class="card-meta">' +
+            '<span class="fname" title="'+escapeHtml(e.file.name)+'">'+escapeHtml(e.file.name)+'</span>' +
+            '<span class="fdim">'+(e.w && e.h ? (e.w+' × '+e.h) : '…')+' · '+fmtBytes(e.bytes)+'</span>' +
+          '</div>' +
+          '<div class="card-actions">' +
+            '<button class="icon-btn" type="button" data-action="up" data-id="'+e.id+'" title="Move earlier" aria-label="Move earlier"'+(i===0?' disabled':'')+'>'+icons.up+'</button>' +
+            '<button class="icon-btn" type="button" data-action="down" data-id="'+e.id+'" title="Move later" aria-label="Move later"'+(i===state.images.length-1?' disabled':'')+'>'+icons.down+'</button>' +
+            '<button class="icon-btn" type="button" data-action="rotate" data-id="'+e.id+'" title="Rotate 90°" aria-label="Rotate">'+icons.rotate+'</button>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join("");
+  }
+
+  grid.addEventListener("click", function(ev){
+    var btn = ev.target.closest("button[data-action]");
+    if(!btn) return;
+    var id = btn.getAttribute("data-id");
+    var action = btn.getAttribute("data-action");
+    if(action==="remove") removeImage(id);
+    else if(action==="rotate") rotateImage(id);
+    else if(action==="up") moveImage(id,-1);
+    else if(action==="down") moveImage(id,1);
+  });
+
+  var dragSrcId = null;
+  grid.addEventListener("dragstart", function(ev){
+    var card = ev.target.closest(".card");
+    if(!card) return;
+    dragSrcId = card.getAttribute("data-id");
+    ev.dataTransfer.effectAllowed = "move";
+    try{ ev.dataTransfer.setData("text/plain", dragSrcId); }catch(e){}
+    card.classList.add("dragging");
+  });
+  grid.addEventListener("dragend", function(ev){
+    var card = ev.target.closest(".card");
+    if(card) card.classList.remove("dragging");
+    dragSrcId = null;
+  });
+  grid.addEventListener("dragover", function(ev){
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "move";
+  });
+  grid.addEventListener("drop", function(ev){
+    ev.preventDefault();
+    var card = ev.target.closest(".card");
+    if(!card || !dragSrcId) return;
+    reorderDrop(dragSrcId, card.getAttribute("data-id"));
+  });
+
+  function bindSegmented(id, key){
+    var group = document.getElementById(id);
+    group.addEventListener("click", function(ev){
+      var btn = ev.target.closest("button[data-value]");
+      if(!btn || btn.disabled) return;
+      $all("button", group).forEach(function(b){
+        var isActive = (b===btn);
+        b.classList.toggle("active", isActive);
+        b.setAttribute("aria-pressed", isActive ? "true" : "false");
+      });
+      state.settings[key] = btn.getAttribute("data-value");
+      if(key==="quality") qualityHint.textContent = QUALITY_HINT[state.settings.quality];
+      syncPageSizeDependents();
+    });
+  }
+  bindSegmented("orientationGroup","orientation");
+  bindSegmented("marginGroup","margin");
+  bindSegmented("fitGroup","fit");
+  bindSegmented("qualityGroup","quality");
+
+  pageSizeSel.addEventListener("change", function(){
+    state.settings.pageSize = pageSizeSel.value;
+    syncPageSizeDependents();
+  });
+
+  function syncPageSizeDependents(){
+    var isFit = state.settings.pageSize === "fit";
+    var og = $("#orientationGroup"), fg = $("#fitGroup");
+    og.classList.toggle("disabled", isFit);
+    fg.classList.toggle("disabled", isFit);
+    $all("button", og).forEach(function(b){ b.disabled = isFit; });
+    $all("button", fg).forEach(function(b){ b.disabled = isFit; });
+  }
+  syncPageSizeDependents();
+
+  addBtn.addEventListener("click", function(){ fileInput.click(); });
+  fileInput.addEventListener("change", function(){ addFiles(fileInput.files); fileInput.value=""; });
+  dropzone.addEventListener("click", function(){ fileInput.click(); });
+
+  ["dragenter","dragover"].forEach(function(evt){
+    sheet.addEventListener(evt, function(e){ e.preventDefault(); sheet.classList.add("drag-active"); });
+  });
+  sheet.addEventListener("dragleave", function(e){
+    if(e.target === sheet || e.target === dropzone) sheet.classList.remove("drag-active");
+  });
+  sheet.addEventListener("drop", function(e){
+    e.preventDefault();
+    sheet.classList.remove("drag-active");
+    if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  });
+
+  function renderToCanvas(entry){
+    var rot = entry.rotation % 360;
+    var swap = (rot===90 || rot===270);
+    var w = swap ? entry.h : entry.w;
+    var h = swap ? entry.w : entry.h;
+    var canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0,0,w,h);
+    ctx.save();
+    ctx.translate(w/2,h/2);
+    ctx.rotate(rot*Math.PI/180);
+    ctx.drawImage(entry.img, -entry.w/2, -entry.h/2);
+    ctx.restore();
+    return canvas;
+  }
+
+  function capLongEdge(canvas, maxEdge){
+    if(!maxEdge) return canvas;
+    var longest = Math.max(canvas.width, canvas.height);
+    if(longest <= maxEdge) return canvas;
+    var scale = maxEdge/longest;
+    var out = document.createElement("canvas");
+    out.width = Math.round(canvas.width*scale);
+    out.height = Math.round(canvas.height*scale);
+    out.getContext("2d").drawImage(canvas,0,0,out.width,out.height);
+    return out;
+  }
+
+  function cropToRatio(canvas, targetRatio){
+    var w = canvas.width, h = canvas.height;
+    var ratio = w/h;
+    var sx=0, sy=0, sw=w, sh=h;
+    if(ratio > targetRatio){ sw = h*targetRatio; sx = (w-sw)/2; }
+    else { sh = w/targetRatio; sy = (h-sh)/2; }
+    var out = document.createElement("canvas");
+    out.width = sw; out.height = sh;
+    out.getContext("2d").drawImage(canvas, sx,sy,sw,sh, 0,0,sw,sh);
+    return out;
+  }
+
+  function tick(){ return new Promise(function(r){ requestAnimationFrame(function(){ requestAnimationFrame(r); }); }); }
+
+  async function convertToPdf(){
+    if(state.busy || !state.images.length) return;
+    if(!window.jspdf){ setStatus("The PDF engine failed to load. Check your connection and try again.", "error"); return; }
+    state.busy = true;
+    convertBtn.disabled = true;
+    convertBtn.classList.add("busy");
+    var jsPDF = window.jspdf.jsPDF;
+    var doc = null;
+    var margin = MARGINS[state.settings.margin];
+    var qcfg = QUALITY[state.settings.quality];
+    var pxToPt = 72/96;
+
+    try{
+      for(var i=0;i<state.images.length;i++){
+        var entry = state.images[i];
+        setStatus("Rendering page " + (i+1) + " of " + state.images.length + "…");
+        await tick();
+
+        var canvas = renderToCanvas(entry);
+        canvas = capLongEdge(canvas, qcfg.cap);
+        var wPx = canvas.width, hPx = canvas.height;
+
+        var pageW, pageH;
+        if(state.settings.pageSize === "fit"){
+          pageW = wPx*pxToPt + margin*2;
+          pageH = hPx*pxToPt + margin*2;
+        } else {
+          var base = PAGE_SIZES[state.settings.pageSize];
+          var bw = base[0], bh = base[1];
+          var landscape;
+          if(state.settings.orientation==="auto") landscape = wPx > hPx;
+          else landscape = state.settings.orientation==="landscape";
+          if(landscape){ pageW = bh; pageH = bw; } else { pageW = bw; pageH = bh; }
+        }
+
+        var availW = Math.max(1, pageW - margin*2);
+        var availH = Math.max(1, pageH - margin*2);
+        var boxRatio = availW/availH;
+
+        var sourceCanvas = canvas;
+        var drawW, drawH;
+        if(state.settings.fit === "cover" && state.settings.pageSize !== "fit"){
+          sourceCanvas = cropToRatio(canvas, boxRatio);
+          drawW = availW; drawH = availH;
+        } else {
+          var imgRatio = wPx/hPx;
+          if(imgRatio > boxRatio){ drawW = availW; drawH = availW/imgRatio; }
+          else { drawH = availH; drawW = availH*imgRatio; }
+        }
+
+        var dataUrl = sourceCanvas.toDataURL("image/jpeg", qcfg.q);
+        var x = margin + (availW-drawW)/2;
+        var y = margin + (availH-drawH)/2;
+        var orient = pageW >= pageH ? "l" : "p";
+
+        if(!doc){
+          doc = new jsPDF({ orientation:orient, unit:"pt", format:[pageW,pageH] });
+        } else {
+          doc.addPage([pageW,pageH], orient);
+        }
+        doc.addImage(dataUrl, "JPEG", x, y, drawW, drawH);
+      }
+
+      var blob = doc.output("blob");
+      setStatus("Preparing your download…");
+      await savePdf(blob, "contact-sheet.pdf");
+    } catch(err){
+      console.error(err);
+      setStatus("Something went wrong building the PDF. Please try again.", "error");
+    } finally {
+      state.busy = false;
+      convertBtn.disabled = !state.images.length;
+      convertBtn.classList.remove("busy");
+    }
+  }
+
+  async function savePdf(blob, filename){
+    if(window.claude && typeof window.claude.use === "function"){
+      try{
+        var downloads = await window.claude.use("downloads");
+        if(downloads){
+          var result = await downloads.save({ filename:filename, data:blob });
+          setStatus(result.status === "saved" ? "Saved." : "Sent.", "success");
+          return;
+        }
+      } catch(err){
+        if(err && err.code === "declined"){ setStatus("Download cancelled.", ""); return; }
+        if(err && err.code === "too_large"){ setStatus("That PDF is too large to save from here.", "error"); return; }
+        // otherwise fall through to a plain browser download
+      }
+    }
+    try{
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      setStatus("Saved.", "success");
+    } catch(err){
+      console.error(err);
+      setStatus("Couldn't start the download here.", "error");
+    }
+  }
+
+  convertBtn.addEventListener("click", convertToPdf);
+
+  render();
+})();
+</script>
+</body>
+</html>
